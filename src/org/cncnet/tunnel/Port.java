@@ -30,7 +30,7 @@ class Port {
 
     protected Port(InetAddress ip, List<DatagramChannel> chanList) {
         this.ip = ip;
-        this.out = new HashMap<>();
+        this.out = new HashMap<DatagramChannel, Integer>();
 
         for (DatagramChannel channel : chanList) {
             this.out.put(channel, 0);

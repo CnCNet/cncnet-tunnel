@@ -16,15 +16,14 @@
 package org.cncnet.tunnel;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Map;
+import java.util.List;
 
 /**
  *
@@ -33,27 +32,20 @@ import java.util.Map;
 public class Main {
     public static void main(String[] args) {
         try {
-            Map<InetAddress, DatagramChannel> clients = new HashMap<>();
-
-            DatagramChannel ch1 = DatagramChannel.open();
-            ch1.bind(new InetSocketAddress("0.0.0.0", 50000));
-            DatagramChannel ch2 = DatagramChannel.open();
-            ch2.bind(new InetSocketAddress("0.0.0.0", 50001));
-            DatagramChannel ch3 = DatagramChannel.open();
-            ch3.bind(new InetSocketAddress("0.0.0.0", 50002));
-
-            clients.put(InetAddress.getByName("1.1.1.1"), ch1);
-            clients.put(InetAddress.getByName("2.2.2.2"), ch2);
-            clients.put(InetAddress.getByName("3.3.3.3"), ch3);
-
-            Router router = new Router(clients);
-
             Selector selector = Selector.open();
+            List<DatagramChannel> channels = new ArrayList<DatagramChannel>();
 
-            for (DatagramChannel chan : clients.values()) {
-                chan.configureBlocking(false);
-                chan.register(selector, SelectionKey.OP_READ);
+            // do a static allocation of 100 ports for now
+            for (int i = 50000; i < 50100; i++) {
+                DatagramChannel channel = DatagramChannel.open();
+                channel.configureBlocking(false);
+                channel.socket().bind(new InetSocketAddress("0.0.0.0", i));
+                channel.register(selector, SelectionKey.OP_READ);
+                channels.add(channel);
             }
+
+            TunnelController controller = new TunnelController(channels);
+            new Thread(controller).start();
 
             ByteBuffer buf = ByteBuffer.allocate(4096);
 
@@ -66,7 +58,8 @@ public class Main {
                         try {
                             buf.clear();
                             InetSocketAddress from = (InetSocketAddress)chan.receive(buf);
-                            RouteResult res = router.route(from, chan);
+                            Router router = controller.getRouter(chan);
+                            RouteResult res = (router == null ? null : router.route(from, chan));
                             if (res == null) {
                                 System.out.println("Ignoring packet from " + from + " (routing failed), was " + buf.position() + " bytes");
                             } else {

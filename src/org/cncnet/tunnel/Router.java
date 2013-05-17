@@ -30,12 +30,14 @@ import java.util.Map;
 public class Router {
     private Map<DatagramChannel, Port> portMap;
     private Map<InetAddress, DatagramChannel> ipMap;
+    private long lastPacket;
 
     public Router(Map<InetAddress, DatagramChannel> ipMap) {
-        this.portMap = new HashMap<>();
-        this.ipMap = new HashMap<>(ipMap);
+        this.portMap = new HashMap<DatagramChannel, Port>();
+        this.ipMap = new HashMap<InetAddress, DatagramChannel>(ipMap);
+        this.lastPacket = System.currentTimeMillis();
 
-        List<DatagramChannel> chanList = new ArrayList<>();
+        List<DatagramChannel> chanList = new ArrayList<DatagramChannel>();
         for (DatagramChannel port : ipMap.values()) {
             chanList.add(port);
         }
@@ -45,7 +47,19 @@ public class Router {
         }
     }
 
+    public boolean inUse() {
+        return inUse(System.currentTimeMillis());
+    }
+
+    public boolean inUse(long now) {
+        return lastPacket + 60000 > now;
+    }
+
     public RouteResult route(InetSocketAddress source, DatagramChannel channel) {
+        return route(source, channel, System.currentTimeMillis());
+    }
+
+    public RouteResult route(InetSocketAddress source, DatagramChannel channel, long now) {
         Port inPort = portMap.get(channel);
 
         if (inPort == null) {
@@ -68,6 +82,7 @@ public class Router {
             return null;
         }
 
+        lastPacket = now;
         return new RouteResult(new InetSocketAddress(dstIp, dstPort), outChannel);
     }
 }
