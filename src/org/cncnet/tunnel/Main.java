@@ -61,14 +61,12 @@ public class Main {
                             Router router = controller.getRouter(chan);
                             RouteResult res = (router == null ? null : router.route(from, chan));
                             if (res == null) {
-                                System.out.println("Ignoring packet from " + from + " (routing failed), was " + buf.position() + " bytes");
+                                //System.out.println("Ignoring packet from " + from + " (routing failed), was " + buf.position() + " bytes");
                             } else {
-                                System.out.println("Packet from " + from + " routed to " + res.getDestination() + ", was " + buf.position() + " bytes");
+                                //System.out.println("Packet from " + from + " routed to " + res.getDestination() + ", was " + buf.position() + " bytes");
                                 int len = buf.position();
                                 buf.flip();
-                                if (res.getChannel().send(buf, res.getDestination()) < len) {
-                                    System.out.println("  PACKET WAS DROPPED");
-                                }
+                                res.getChannel().send(buf, res.getDestination());
                             }
                         } catch (IOException e) {
                             System.out.println("IOException when handling event: " + e.getMessage());

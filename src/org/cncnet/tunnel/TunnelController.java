@@ -25,12 +25,14 @@ import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.channels.DatagramChannel;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -39,11 +41,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class TunnelController implements HttpHandler, Runnable {
 
-    private List<DatagramChannel> pool;
+    private BlockingQueue<DatagramChannel> pool;
     private Map<DatagramChannel, Router> routers;
 
     public TunnelController(List<DatagramChannel> channels) {
-        pool = Collections.synchronizedList(channels);
+        pool = new ArrayBlockingQueue<DatagramChannel>(channels.size(), true, channels);
         routers = new ConcurrentHashMap<DatagramChannel, Router>();
     }
 
@@ -81,15 +83,18 @@ public class TunnelController implements HttpHandler, Runnable {
         if (addresses.size() < 2)
             throw new IOException("Empty game?");
 
-        if (addresses.size() > pool.size())
-            throw new IOException("Not enough free ports");
-
         StringBuilder ret = new StringBuilder();
 
-        for (InetAddress address : addresses) {
-            DatagramChannel channel = pool.remove(0);
-            ret.append(address.toString().substring(1) + " " + channel.socket().getLocalPort() + "\n");
-            clients.put(address, channel);
+        try {
+            for (InetAddress address : addresses) {
+                DatagramChannel channel = pool.remove();
+                ret.append(address.toString().substring(1) + " " + channel.socket().getLocalPort() + "\n");
+                clients.put(address, channel);
+            }
+        } catch (NoSuchElementException e) {
+            // if not enough 
+            pool.addAll(clients.values());
+            throw new IOException("Not enough free ports");
         }
 
         Router router = new Router(clients);
