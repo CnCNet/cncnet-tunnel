@@ -47,6 +47,7 @@ public class TunnelController implements HttpHandler, Runnable {
 
     private BlockingQueue<DatagramChannel> pool;
     private Map<DatagramChannel, Router> routers;
+    private Map<String, Router> locks;
 
     private String name;
     private String password;
@@ -58,6 +59,7 @@ public class TunnelController implements HttpHandler, Runnable {
     public TunnelController(List<DatagramChannel> channels, String name, String password, int port, int maxclients, String master, String masterpw) {
         pool = new ArrayBlockingQueue<DatagramChannel>(channels.size(), true, channels);
         routers = new ConcurrentHashMap<DatagramChannel, Router>();
+        locks = new ConcurrentHashMap<String, Router>();
 
         this.name = name;
         this.password = password;
@@ -77,6 +79,7 @@ public class TunnelController implements HttpHandler, Runnable {
         Map<InetAddress, DatagramChannel> clients = new HashMap<InetAddress, DatagramChannel>();
         String params = t.getRequestURI().getQuery();
         List<InetAddress> addresses = new ArrayList<InetAddress>();
+        String requestAddress = t.getRemoteAddress().getAddress().getHostAddress();
         boolean pwOk = (password == null);
 
         if (params == null)
@@ -119,6 +122,15 @@ public class TunnelController implements HttpHandler, Runnable {
             return;
         }
 
+        // lock the request ip out until this router is collected
+        if (locks.containsKey(requestAddress)) {
+            // Too Many Requests
+            Main.log("Same address tried to request more than one active router.");
+            t.sendResponseHeaders(429, 0);
+            t.getResponseBody().close();
+            return;
+        }
+
         StringBuilder ret = new StringBuilder();
 
         try {
@@ -138,6 +150,10 @@ public class TunnelController implements HttpHandler, Runnable {
         }
 
         Router router = new Router(clients);
+        router.setAttachment(requestAddress);
+
+        // lock the request ip out until this router is collected
+        locks.put(t.getRemoteAddress().getAddress().getHostAddress(), router);
 
         Set<Entry<InetAddress, DatagramChannel>> entries = clients.entrySet();
 
@@ -241,6 +257,11 @@ public class TunnelController implements HttpHandler, Runnable {
                     Main.log("Port " + channel.socket().getLocalPort() +  " timed out from router " + router.hashCode() + ".");
                     pool.add(channel);
                     i.remove();
+
+                    // technically slow but fast enough for us
+                    if (locks.containsKey(router.getAttachment())) {
+                        locks.remove(router.getAttachment());
+                    }
                 }
             }
 

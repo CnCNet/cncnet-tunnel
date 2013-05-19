@@ -31,6 +31,7 @@ public class Router {
     private Map<DatagramChannel, Port> portMap;
     private Map<InetAddress, DatagramChannel> ipMap;
     private long lastPacket;
+    private Object attachment = null;
 
     public Router(Map<InetAddress, DatagramChannel> ipMap) {
         this.portMap = new HashMap<DatagramChannel, Port>();
@@ -49,6 +50,14 @@ public class Router {
 
     public long getLastPacket() {
         return lastPacket;
+    }
+
+    public void setAttachment(Object attachment) {
+        this.attachment = attachment;
+    }
+
+    public Object getAttachment() {
+        return attachment;
     }
 
     public RouteResult route(InetSocketAddress source, DatagramChannel channel) {
