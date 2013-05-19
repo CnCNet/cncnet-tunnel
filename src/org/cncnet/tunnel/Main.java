@@ -72,6 +72,9 @@ public class Main {
                 nomaster = true;
             } else if (args[i].equals("-logfile") && i < args.length - 1) {
                 logfile = args[++i];
+            } else if (args[i].equals("-help") || args[i].equals("-h") || args[i].equals("-?") || args[i].equals("/h") || args[i].equals("/?")) {
+                System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-firstport <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>]");
+                return;
             } else {
                 Main.log("Unknown parameter: " + args[i]);
             }
