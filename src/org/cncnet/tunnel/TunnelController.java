@@ -77,29 +77,47 @@ public class TunnelController implements HttpHandler, Runnable {
         Map<InetAddress, DatagramChannel> clients = new HashMap<InetAddress, DatagramChannel>();
         String params = t.getRequestURI().getQuery();
         List<InetAddress> addresses = new ArrayList<InetAddress>();
+        boolean pwOk = (password == null);
 
-        if (params != null) {
-            String[] pairs = params.split("&");
-            for (int i = 0; i < pairs.length; i++) {
-                String kv[] = pairs[i].split("=");
-                if (kv.length != 2)
-                    continue;
+        if (params == null)
+            params = "";
 
-                kv[0] = URLDecoder.decode(kv[0], "UTF-8");
-                kv[1] = URLDecoder.decode(kv[1], "UTF-8");
+        String[] pairs = params.split("&");
+        for (int i = 0; i < pairs.length; i++) {
+            String kv[] = pairs[i].split("=");
+            if (kv.length != 2)
+                continue;
 
-                if (!kv[0].equals("ip[]"))
-                    throw new IOException("Invalid parameters.");
+            kv[0] = URLDecoder.decode(kv[0], "UTF-8");
+            kv[1] = URLDecoder.decode(kv[1], "UTF-8");
 
+            if (kv[0].equals("ip[]")) {
                 InetAddress address = InetAddress.getByName(kv[1]);
                 if (address != null) {
                     addresses.add(address);
                 }
             }
+
+            if (kv[0].equals("password") && !pwOk && kv[1].equals(password)) {
+                pwOk = true;
+            }
         }
 
-        if (addresses.size() < 2)
-            throw new IOException("Empty game?");
+        if (!pwOk) {
+            // Unauthorized
+            Main.log("Request was unauthorized.");
+            t.sendResponseHeaders(401, 0);
+            t.getResponseBody().close();
+            return;
+        }
+
+        if (addresses.size() < 2 || addresses.size() > 8) {
+            // Bad Request
+            Main.log("Request had invalid amount of addresses.");
+            t.sendResponseHeaders(400, 0);
+            t.getResponseBody().close();
+            return;
+        }
 
         StringBuilder ret = new StringBuilder();
 
@@ -112,7 +130,11 @@ public class TunnelController implements HttpHandler, Runnable {
         } catch (NoSuchElementException e) {
             // if not enough 
             pool.addAll(clients.values());
-            throw new IOException("Not enough free ports");
+            // Service Unavailable
+            Main.log("Request wanted more than we could provide.");
+            t.sendResponseHeaders(503, 0);
+            t.getResponseBody().close();
+            return;
         }
 
         Router router = new Router(clients);
