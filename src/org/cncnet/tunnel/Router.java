@@ -47,12 +47,8 @@ public class Router {
         }
     }
 
-    public boolean inUse() {
-        return inUse(System.currentTimeMillis());
-    }
-
-    public boolean inUse(long now) {
-        return lastPacket + 60000 > now;
+    public long getLastPacket() {
+        return lastPacket;
     }
 
     public RouteResult route(InetSocketAddress source, DatagramChannel channel) {

@@ -17,18 +17,22 @@ package org.cncnet.tunnel;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.channels.DatagramChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -44,9 +48,23 @@ public class TunnelController implements HttpHandler, Runnable {
     private BlockingQueue<DatagramChannel> pool;
     private Map<DatagramChannel, Router> routers;
 
-    public TunnelController(List<DatagramChannel> channels) {
+    private String name;
+    private String password;
+    private int maxclients;
+    private int port;
+    private String master;
+    private String masterpw = null;
+
+    public TunnelController(List<DatagramChannel> channels, String name, String password, int port, int maxclients, String master, String masterpw) {
         pool = new ArrayBlockingQueue<DatagramChannel>(channels.size(), true, channels);
         routers = new ConcurrentHashMap<DatagramChannel, Router>();
+
+        this.name = name;
+        this.password = password;
+        this.maxclients = maxclients;
+        this.port = port;
+        this.master = master;
+        this.masterpw = masterpw;
     }
 
     // will get called by another thread
@@ -99,7 +117,12 @@ public class TunnelController implements HttpHandler, Runnable {
 
         Router router = new Router(clients);
 
-        for (DatagramChannel channel : clients.values()) {
+        Set<Entry<InetAddress, DatagramChannel>> entries = clients.entrySet();
+
+        for (Entry<InetAddress, DatagramChannel> entry : entries) {
+            DatagramChannel channel = entry.getValue();
+            InetAddress address = entry.getKey();
+            Main.log("Port " + channel.socket().getLocalPort() + " allocated for " + address.toString() + " in router " + router.hashCode() + ".");
             routers.put(channel, router);
         }
 
@@ -111,7 +134,7 @@ public class TunnelController implements HttpHandler, Runnable {
 
     private void handleStatus(HttpExchange t) throws IOException {
         String response = pool.size() + " slots free.\n" + routers.size() + " slots in use.\n";
-        System.out.println("Response: " + response);
+        Main.log("Response: " + response);
         t.sendResponseHeaders(200, response.length());
         OutputStream os = t.getResponseBody();
         os.write(response.getBytes());
@@ -123,7 +146,7 @@ public class TunnelController implements HttpHandler, Runnable {
         String uri = t.getRequestURI().toString();
         t.getRequestBody().close();
 
-        System.out.println("Request: " + uri);
+        Main.log("HTTPRequest: " + uri);
 
         try {
             if (uri.startsWith("/request")) {
@@ -134,7 +157,7 @@ public class TunnelController implements HttpHandler, Runnable {
                 t.sendResponseHeaders(400, 0);
             }
         } catch (IOException e) {
-            System.out.println("Error: " + e.getMessage());
+            Main.log("Error: " + e.getMessage());
             String error = e.getMessage();
             t.sendResponseHeaders(500, error.length());
             OutputStream os = t.getResponseBody();
@@ -146,37 +169,61 @@ public class TunnelController implements HttpHandler, Runnable {
     @Override
     public void run() {
 
-        try {
-            // setup our HTTP server
-            HttpServer server = HttpServer.create(new InetSocketAddress(8000), 4);
-            server.createContext("/request", this);
-            server.createContext("/status", this);
-            server.setExecutor(null);
-            server.start();
-        } catch (IOException e) {
-            System.out.println("Failed to start HTTP server.");
-            return;
-        }
+        long lastHeartbeat = 0;
 
-        System.out.println("TunnelController started.");
+        Main.log("TunnelController started.");
 
         while (true) {
 
             long now = System.currentTimeMillis();
+
+            if (lastHeartbeat + 60000 < now && master != null) {
+                Main.log("Sending a heartbeat to master server.");
+
+                try {
+                    URL url = new URL(
+                        master + "?"
+                        + "name=" + URLEncoder.encode(name, "US-ASCII")
+                        + "&password=" + (password == null ? "0" : "1")
+                        + "&port=" + port
+                        + "&clients=" + routers.size()
+                        + "&maxclients=" + maxclients
+                        + (masterpw != null ? "&masterpw=" + URLEncoder.encode(masterpw, "US-ASCII") : "")
+                    );
+                    HttpURLConnection con = (HttpURLConnection)url.openConnection();
+                    con.setRequestMethod("GET");
+                    con.setConnectTimeout(5000);
+                    con.setReadTimeout(5000);
+                    con.connect();
+                    con.getInputStream().close();
+                    con.disconnect();
+                } catch (FileNotFoundException e) {
+                    Main.log("Master server reported error 404.");
+                } catch (MalformedURLException e) {
+                    Main.log("Failed to send heartbeat: " + e.toString());
+                } catch (IOException e) {
+                    Main.log("Failed to send heartbeat: " + e.toString());
+                }
+
+                lastHeartbeat = now;
+            }
+
             Set<Map.Entry<DatagramChannel, Router>> set = routers.entrySet();
 
             for (Iterator<Map.Entry<DatagramChannel, Router>> i = set.iterator(); i.hasNext();) {
                 Map.Entry<DatagramChannel, Router> e = i.next();
+                Router router = e.getValue();
 
-                if (!e.getValue().inUse(now)) {
-                    System.out.println("Found a timed out mapping.");
-                    pool.add(e.getKey());
+                if (router.getLastPacket() + 60000 < now) {
+                    DatagramChannel channel = e.getKey();
+                    Main.log("Port " + channel.socket().getLocalPort() +  " timed out from router " + router.hashCode() + ".");
+                    pool.add(channel);
                     i.remove();
                 }
             }
 
             try {
-                Thread.sleep(1000);
+                Thread.sleep(5000);
             } catch (InterruptedException e) {
                 return;
             }
