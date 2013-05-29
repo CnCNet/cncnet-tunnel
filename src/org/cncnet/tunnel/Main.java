@@ -135,6 +135,9 @@ public class Main {
 
             while (true) {
                 if (selector.select() > 0) {
+
+                    long now = System.currentTimeMillis();
+
                     for (Iterator<SelectionKey> i = selector.selectedKeys().iterator(); i.hasNext();) {
                         SelectionKey k = i.next();
                         DatagramChannel chan = (DatagramChannel)k.channel();
@@ -143,7 +146,7 @@ public class Main {
                             buf.clear();
                             InetSocketAddress from = (InetSocketAddress)chan.receive(buf);
                             Router router = controller.getRouter(chan);
-                            RouteResult res = (router == null ? null : router.route(from, chan));
+                            RouteResult res = (router == null ? null : router.route(from, chan, now));
                             if (res == null) {
                                 //Main.log("Ignoring packet from " + from + " (routing failed), was " + buf.position() + " bytes");
                             } else {
