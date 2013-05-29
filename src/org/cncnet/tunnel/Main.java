@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import javax.swing.JFrame;
 
 /**
  *
@@ -35,6 +36,7 @@ import java.util.List;
 public class Main {
 
     static FileOutputStream logStream = null;
+    static StatusWindow statusWindow = null;
 
     // -name <str>          Custom name for the tunnel
     // -maxclients <num>    Maximum number of ports to allocate
@@ -53,6 +55,7 @@ public class Main {
         String master = "http://cncnet.org/master-announce";
         String masterpw = null;
         boolean nomaster = false;
+        boolean headless = false;
         String logfile = null;
 
         for (int i = 0; i < args.length; i++) {
@@ -72,12 +75,21 @@ public class Main {
                 nomaster = true;
             } else if (args[i].equals("-logfile") && i < args.length - 1) {
                 logfile = args[++i];
+            } else if (args[i].equals("-headless")) {
+                headless = true;
             } else if (args[i].equals("-help") || args[i].equals("-h") || args[i].equals("-?") || args[i].equals("/h") || args[i].equals("/?")) {
                 System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-firstport <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>]");
                 return;
             } else {
                 Main.log("Unknown parameter: " + args[i]);
             }
+        }
+
+        if (!headless) {
+            statusWindow = new StatusWindow();
+            statusWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            statusWindow.status("Initializing...");
+            statusWindow.setVisible(true);
         }
 
         firstport = Math.min(firstport, 65535 - maxclients);
@@ -174,15 +186,27 @@ public class Main {
 
     public static void log(String s) {
         for (String line : s.split("\n")) {
-            String out = "[" + new Date().toString() + "] " + line + "\n";
-            System.out.print(out);
+            String out = "[" + new Date().toString() + "] " + line;
+            System.out.println(out);
+
+            if (statusWindow != null) {
+                statusWindow.log(out);
+            }
+
             if (logStream != null) {
+                out += "\n";
                 try {
                     logStream.write(out.getBytes());
                 } catch (IOException e) {
 
                 }
             }
+        }
+    }
+
+    public static void status(String s) {
+        if (statusWindow != null) {
+            statusWindow.status(s);
         }
     }
 }

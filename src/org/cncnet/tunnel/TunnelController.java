@@ -209,7 +209,11 @@ public class TunnelController implements HttpHandler, Runnable {
 
         long lastHeartbeat = 0;
 
+        Main.status("Connecting...");
+
         Main.log("TunnelController started.");
+
+        boolean connected = false;
 
         while (true) {
 
@@ -218,6 +222,7 @@ public class TunnelController implements HttpHandler, Runnable {
             if (lastHeartbeat + 60000 < now && master != null) {
                 Main.log("Sending a heartbeat to master server.");
 
+                connected = false;
                 try {
                     URL url = new URL(
                         master + "?"
@@ -235,6 +240,7 @@ public class TunnelController implements HttpHandler, Runnable {
                     con.connect();
                     con.getInputStream().close();
                     con.disconnect();
+                    connected = true;
                 } catch (FileNotFoundException e) {
                     Main.log("Master server reported error 404.");
                 } catch (MalformedURLException e) {
@@ -263,6 +269,11 @@ public class TunnelController implements HttpHandler, Runnable {
                     }
                 }
             }
+
+            Main.status(
+                (connected ? "Connected. " : "Disconnected from master. ") +
+                routers.size() + " / " + maxclients + " players online."
+            );
 
             try {
                 Thread.sleep(5000);
