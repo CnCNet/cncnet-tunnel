@@ -258,7 +258,6 @@ public class TunnelController implements HttpHandler, Runnable {
                     pool.add(channel);
                     i.remove();
 
-                    // technically slow but fast enough for us
                     if (locks.containsKey(router.getAttachment())) {
                         locks.remove(router.getAttachment());
                     }

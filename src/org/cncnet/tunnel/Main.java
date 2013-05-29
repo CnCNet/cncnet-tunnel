@@ -111,7 +111,6 @@ public class Main {
             Selector selector = Selector.open();
             List<DatagramChannel> channels = new ArrayList<DatagramChannel>();
 
-            // do a static allocation of 100 ports for now
             for (int i = 0; i < maxclients; i++) {
                 DatagramChannel channel = DatagramChannel.open();
                 channel.configureBlocking(false);
