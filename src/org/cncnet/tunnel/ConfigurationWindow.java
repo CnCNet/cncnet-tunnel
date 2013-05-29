@@ -15,6 +15,7 @@
  */
 package org.cncnet.tunnel;
 
+import javax.swing.ImageIcon;
 import javax.swing.JSpinner;
 
 /**
@@ -28,6 +29,7 @@ public class ConfigurationWindow extends javax.swing.JFrame {
      */
     public ConfigurationWindow() {
         initComponents();
+        setIconImage(new ImageIcon(Main.class.getResource("res/cncnet-icon.png")).getImage());
     }
 
     /**
