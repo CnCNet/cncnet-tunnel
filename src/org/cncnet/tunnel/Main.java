@@ -28,6 +28,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import javax.swing.JFrame;
+import javax.swing.UIManager;
 
 /**
  *
@@ -46,17 +47,17 @@ public class Main {
     // -nomaster            Don't register to master
     // -logfile <str>       Log everything to this file
 
-    public static void main(String[] args) {
+    protected static String name = "Unnamed CnCNet 5 tunnel";
+    protected static int maxclients = 8;
+    protected static String password = null;
+    protected static int firstport = 50000;
+    protected static String master = "http://cncnet.org/master-announce";
+    protected static String masterpw = null;
+    protected static boolean nomaster = false;
+    protected static boolean headless = false;
+    protected static String logfile = null;
 
-        String name = "Unnamed CnCNet 5 tunnel";
-        int maxclients = 8;
-        String password = null;
-        int firstport = 50000;
-        String master = "http://cncnet.org/master-announce";
-        String masterpw = null;
-        boolean nomaster = false;
-        boolean headless = false;
-        String logfile = null;
+    public static void main(String[] args) {
 
         for (int i = 0; i < args.length; i++) {
             if (args[i].equals("-name") && i < args.length - 1) {
@@ -84,6 +85,21 @@ public class Main {
                 Main.log("Unknown parameter: " + args[i]);
             }
         }
+
+        if (!headless) {
+            try {
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            } catch (Exception e) { }
+
+            ConfigurationWindow configurationWindow = new ConfigurationWindow();
+            configurationWindow.setVisible(true);
+            configurationWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        } else {
+            start();
+        }
+    }
+
+    public static void start() {
 
         if (!headless) {
             statusWindow = new StatusWindow();
