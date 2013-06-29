@@ -81,6 +81,7 @@ public class TunnelController implements HttpHandler, Runnable {
         List<InetAddress> addresses = new ArrayList<InetAddress>();
         String requestAddress = t.getRemoteAddress().getAddress().getHostAddress();
         boolean pwOk = (password == null);
+        boolean json = false;
 
         if (params == null)
             params = "";
@@ -103,6 +104,10 @@ public class TunnelController implements HttpHandler, Runnable {
 
             if (kv[0].equals("password") && !pwOk && kv[1].equals(password)) {
                 pwOk = true;
+            }
+
+            if (kv[0].equals("json") && kv[1].length() > 0 && !kv[1].equals("0")) {
+                json = true;
             }
         }
 
@@ -133,10 +138,18 @@ public class TunnelController implements HttpHandler, Runnable {
 
         StringBuilder ret = new StringBuilder();
 
+        if (json) {
+            ret.append("{");
+        }
+
         try {
             for (InetAddress address : addresses) {
                 DatagramChannel channel = pool.remove();
-                ret.append(address.toString().substring(1) + " " + channel.socket().getLocalPort() + "\n");
+                if (json) {
+                    ret.append((clients.size() > 0 ? "," : "") + "'" + address.toString().substring(1) + "':" + channel.socket().getLocalPort());
+                } else {
+                    ret.append(address.toString().substring(1) + " " + channel.socket().getLocalPort() + "\n");
+                }
                 clients.put(address, channel);
             }
         } catch (NoSuchElementException e) {
@@ -147,6 +160,10 @@ public class TunnelController implements HttpHandler, Runnable {
             t.sendResponseHeaders(503, 0);
             t.getResponseBody().close();
             return;
+        }
+
+        if (json) {
+            ret.append("}");
         }
 
         Router router = new Router(clients);
