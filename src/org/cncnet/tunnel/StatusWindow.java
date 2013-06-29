@@ -50,6 +50,7 @@ public class StatusWindow extends JFrame {
         logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         logArea.setBorder(new EmptyBorder(2, 2, 2, 2));
         logArea.setEditable(false);
+        logArea.setAutoscrolls(true);
         JScrollPane logPane = new JScrollPane(logArea);
         logPane.setAlignmentX(LEFT_ALIGNMENT);
 
@@ -80,7 +81,6 @@ public class StatusWindow extends JFrame {
                 } else {
                     logArea.append("\n" + str);
                 }
-                logArea.setCaretPosition(logArea.getText().length());
             }
         });
     }
