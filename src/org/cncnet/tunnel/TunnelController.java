@@ -55,8 +55,9 @@ public class TunnelController implements HttpHandler, Runnable {
     private int port;
     private String master;
     private String masterpw = null;
+    private boolean iplimit;
 
-    public TunnelController(List<DatagramChannel> channels, String name, String password, int port, int maxclients, String master, String masterpw) {
+    public TunnelController(List<DatagramChannel> channels, String name, String password, int port, int maxclients, String master, String masterpw, boolean iplimit) {
         pool = new ArrayBlockingQueue<DatagramChannel>(channels.size(), true, channels);
         routers = new ConcurrentHashMap<DatagramChannel, Router>();
         locks = new ConcurrentHashMap<String, Router>();
@@ -67,6 +68,7 @@ public class TunnelController implements HttpHandler, Runnable {
         this.port = port;
         this.master = master;
         this.masterpw = masterpw;
+        this.iplimit = iplimit;
     }
 
     // will get called by another thread
@@ -170,7 +172,9 @@ public class TunnelController implements HttpHandler, Runnable {
         router.setAttachment(requestAddress);
 
         // lock the request ip out until this router is collected
-        locks.put(t.getRemoteAddress().getAddress().getHostAddress(), router);
+        if (iplimit) {
+            locks.put(t.getRemoteAddress().getAddress().getHostAddress(), router);
+        }
 
         Set<Entry<InetAddress, DatagramChannel>> entries = clients.entrySet();
 

@@ -46,6 +46,8 @@ public class Main {
     // -masterpw <str>      Optional password to send to master when registering
     // -nomaster            Don't register to master
     // -logfile <str>       Log everything to this file
+    // -headless            Don't start up the GUI
+    // -iplimit             Enable (currently too strict) hosting rate limit
 
     protected static String name = "Unnamed CnCNet 5 tunnel";
     protected static int maxclients = 8;
@@ -55,6 +57,7 @@ public class Main {
     protected static String masterpw = null;
     protected static boolean nomaster = false;
     protected static boolean headless = false;
+    protected static boolean iplimit = false;
     protected static String logfile = null;
 
     public static void main(String[] args) {
@@ -78,6 +81,8 @@ public class Main {
                 logfile = args[++i];
             } else if (args[i].equals("-headless")) {
                 headless = true;
+            } else if (args[i].equals("-iplimit")) {
+                iplimit = true;
             } else if (args[i].equals("-help") || args[i].equals("-h") || args[i].equals("-?") || args[i].equals("/h") || args[i].equals("/?")) {
                 System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-firstport <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>]");
                 return;
@@ -135,6 +140,8 @@ public class Main {
             Main.log("Logging to " + logfile);
         }
 
+        Main.log("Host rate limit is " + (iplimit ? "enabled" : "disabled") + ".");
+
         try {
             Selector selector = Selector.open();
             List<DatagramChannel> channels = new ArrayList<DatagramChannel>();
@@ -147,7 +154,7 @@ public class Main {
                 channels.add(channel);
             }
 
-            TunnelController controller = new TunnelController(channels, name, password, firstport, maxclients, nomaster ? null : master, masterpw);
+            TunnelController controller = new TunnelController(channels, name, password, firstport, maxclients, nomaster ? null : master, masterpw, iplimit);
 
             // setup our HTTP server
             HttpServer server = HttpServer.create(new InetSocketAddress(firstport), 4);
