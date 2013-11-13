@@ -15,37 +15,38 @@
  */
 package org.cncnet.tunnel;
 
-import java.net.InetAddress;
-import java.nio.channels.DatagramChannel;
-import java.util.HashMap;
-import java.util.List;
+import java.net.InetSocketAddress;
+import java.util.Map;
 
 /**
  *
  * @author Toni Spets <toni.spets@iki.fi>
  */
-class Port {
-    protected InetAddress ip;
-    protected HashMap<DatagramChannel, Integer> out;
+public class Client {
 
-    protected Port(InetAddress ip, List<DatagramChannel> chanList) {
-        this.ip = ip;
-        this.out = new HashMap<DatagramChannel, Integer>();
+    private short id;
+    private InetSocketAddress address;
+    private long lastPacket;
 
-        for (DatagramChannel channel : chanList) {
-            this.out.put(channel, 0);
-        }
+    public Client(short id) { 
+        this.id = id;
+        this.lastPacket = System.currentTimeMillis();
     }
 
-    protected InetAddress getIp() {
-        return ip;
+    public void setAddress(InetSocketAddress newAddress) {
+        address = newAddress;
     }
 
-    protected int getRoute(DatagramChannel channel) {
-        return out.get(channel);
+    public InetSocketAddress getAddress() {
+        return address;
     }
 
-    protected void setRoute(DatagramChannel channel, int remotePort) {
-        out.put(channel, remotePort);
+    public void setLastPacket(long lastPacketReceived) {
+        lastPacket = lastPacketReceived;
     }
+
+    public long getLastPacket() {
+        return lastPacket;
+    }
+    
 }

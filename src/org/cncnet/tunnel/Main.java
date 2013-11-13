@@ -42,17 +42,17 @@ public class Main {
     // -name <str>          Custom name for the tunnel
     // -maxclients <num>    Maximum number of ports to allocate
     // -password <num>      Usage password
-    // -firstport <num>     Ports are allocated from this up, first doubles as HTTP
+    // -port <num>          The port games are routed at
     // -masterpw <str>      Optional password to send to master when registering
     // -nomaster            Don't register to master
     // -logfile <str>       Log everything to this file
     // -headless            Don't start up the GUI
     // -iplimit             Enable (currently too strict) hosting rate limit
 
-    protected static String name = "Unnamed CnCNet 5 tunnel";
+    protected static String name = "Unnamed CnCNet 5a tunnel";
     protected static int maxclients = 8;
     protected static String password = null;
-    protected static int firstport = 50000;
+    protected static int port = 50000;
     protected static String master = "http://cncnet.org/master-announce";
     protected static String masterpw = null;
     protected static boolean nomaster = false;
@@ -69,8 +69,8 @@ public class Main {
                 maxclients = Math.max(Math.abs(Integer.parseInt(args[++i])), 2);
             } else if (args[i].equals("-password") && i < args.length - 1) {
                 password = args[++i];
-            } else if (args[i].equals("-firstport") && i < args.length - 1) {
-                firstport = Math.max(Math.abs(Integer.parseInt(args[++i])), 1024);
+            } else if (args[i].equals("-port") && i < args.length - 1) {
+                port = Math.max(Math.abs(Integer.parseInt(args[++i])), 1024);
             } else if (args[i].equals("-master") && i < args.length - 1) {
                 master = args[++i];
             } else if (args[i].equals("-masterpw") && i < args.length - 1) {
@@ -113,7 +113,7 @@ public class Main {
             statusWindow.setVisible(true);
         }
 
-        firstport = Math.min(firstport, 65535 - maxclients);
+        port = Math.min(Math.max(port, 1024), 65535);
 
         if (logfile != null) {
             try {
@@ -128,7 +128,7 @@ public class Main {
         Main.log("Max clients: " + maxclients);
         if (password != null)
             Main.log("Password   : " + password);
-        Main.log("Ports      : " + firstport + " - " + (firstport + maxclients - 1) + " (HTTP server on " + firstport + ")");
+        Main.log("Port       : " + port);
         if (masterpw != null && !nomaster)
             Main.log("Master pass: " + masterpw);
         if (nomaster)
@@ -144,20 +144,15 @@ public class Main {
 
         try {
             Selector selector = Selector.open();
-            List<DatagramChannel> channels = new ArrayList<DatagramChannel>();
+            DatagramChannel channel = DatagramChannel.open();
+            channel.configureBlocking(false);
+            channel.socket().bind(new InetSocketAddress("0.0.0.0", port));
+            channel.register(selector, SelectionKey.OP_READ);
 
-            for (int i = 0; i < maxclients; i++) {
-                DatagramChannel channel = DatagramChannel.open();
-                channel.configureBlocking(false);
-                channel.socket().bind(new InetSocketAddress("0.0.0.0", firstport + i));
-                channel.register(selector, SelectionKey.OP_READ);
-                channels.add(channel);
-            }
-
-            TunnelController controller = new TunnelController(channels, name, password, firstport, maxclients, nomaster ? null : master, masterpw, iplimit);
+            TunnelController controller = new TunnelController(name, password, port, maxclients, nomaster ? null : master, masterpw, iplimit);
 
             // setup our HTTP server
-            HttpServer server = HttpServer.create(new InetSocketAddress(firstport), 4);
+            HttpServer server = HttpServer.create(new InetSocketAddress(port), 4);
             server.createContext("/request", controller);
             server.createContext("/status", controller);
             server.setExecutor(null);
@@ -179,15 +174,27 @@ public class Main {
                         try {
                             buf.clear();
                             InetSocketAddress from = (InetSocketAddress)chan.receive(buf);
-                            Router router = controller.getRouter(chan);
-                            RouteResult res = (router == null ? null : router.route(from, chan, now));
-                            if (res == null) {
-                                //Main.log("Ignoring packet from " + from + " (routing failed), was " + buf.position() + " bytes");
+
+                            short hdrFrom = buf.getShort();
+                            short hdrTo = buf.getShort();
+
+                            Client clientFrom = controller.getClient(hdrFrom);
+                            Client clientTo = controller.getClient(hdrTo);
+
+                            if (clientFrom != null) {
+                                if (clientFrom.getAddress() == null) {
+                                    clientFrom.setAddress(from);
+                                }
+                                clientFrom.setLastPacket(now);
+                            }
+
+                            if (clientFrom == null || clientTo == null || clientFrom.getAddress() != from) {
+                                Main.log("Ignoring packet from " + hdrFrom + " to " + hdrTo + " (" + from + "), was " + buf.position() + " bytes");
                             } else {
-                                //Main.log("Packet from " + from + " routed to " + res.getDestination() + ", was " + buf.position() + " bytes");
-                                int len = buf.position();
+                                Main.log("Packet from " + hdrFrom + " routed to " + hdrTo + " (" + clientTo.getAddress() + "), was " + buf.position() + " bytes");
+                                buf.clear();
                                 buf.flip();
-                                res.getChannel().send(buf, res.getDestination());
+                                chan.send(buf, clientTo.getAddress());
                             }
                         } catch (IOException e) {
                             Main.log("IOException when handling event: " + e.getMessage());
