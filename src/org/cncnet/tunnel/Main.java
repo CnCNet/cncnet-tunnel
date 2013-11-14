@@ -174,9 +174,12 @@ public class Main {
                         try {
                             buf.clear();
                             InetSocketAddress from = (InetSocketAddress)chan.receive(buf);
+                            buf.flip();
 
                             short hdrFrom = buf.getShort();
                             short hdrTo = buf.getShort();
+
+                            buf.rewind();
 
                             Client clientFrom = controller.getClient(hdrFrom);
                             Client clientTo = controller.getClient(hdrTo);
@@ -189,12 +192,12 @@ public class Main {
                             }
 
                             if (clientFrom == null || clientTo == null || clientFrom.getAddress() != from) {
-                                Main.log("Ignoring packet from " + hdrFrom + " to " + hdrTo + " (" + from + "), was " + buf.position() + " bytes");
+                                Main.log("Ignoring packet from " + hdrFrom + " to " + hdrTo + " (" + from + "), was " + buf.limit() + " bytes");
                             } else {
-                                Main.log("Packet from " + hdrFrom + " routed to " + hdrTo + " (" + clientTo.getAddress() + "), was " + buf.position() + " bytes");
-                                buf.clear();
-                                buf.flip();
-                                chan.send(buf, clientTo.getAddress());
+                                Main.log("Packet from " + hdrFrom + " routed to " + hdrTo + " (" + clientTo.getAddress() + "), was " + buf.limit() + " bytes");
+                                if (clientTo.getAddress() != null) {
+                                    chan.send(buf, clientTo.getAddress());
+                                }
                             }
                         } catch (IOException e) {
                             Main.log("IOException when handling event: " + e.getMessage());
