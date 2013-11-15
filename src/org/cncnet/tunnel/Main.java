@@ -191,10 +191,10 @@ public class Main {
                                 clientFrom.setLastPacket(now);
                             }
 
-                            if (clientFrom == null || clientTo == null || clientFrom.getAddress() != from) {
+                            if (clientFrom == null || clientTo == null || hdrFrom == hdrTo) {
                                 Main.log("Ignoring packet from " + hdrFrom + " to " + hdrTo + " (" + from + "), was " + buf.limit() + " bytes");
                             } else {
-                                Main.log("Packet from " + hdrFrom + " routed to " + hdrTo + " (" + clientTo.getAddress() + "), was " + buf.limit() + " bytes");
+                                //Main.log("Packet from " + hdrFrom + " routed to " + hdrTo + " (" + clientTo.getAddress() + "), was " + buf.limit() + " bytes");
                                 if (clientTo.getAddress() != null) {
                                     chan.send(buf, clientTo.getAddress());
                                 }
