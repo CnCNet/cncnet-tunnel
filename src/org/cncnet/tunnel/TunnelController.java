@@ -22,20 +22,19 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.nio.channels.DatagramChannel;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  *
@@ -52,7 +51,7 @@ public class TunnelController implements HttpHandler, Runnable {
     private String master;
     private String masterpw = null;
     private boolean iplimit;
-    final private Random serial;
+    private Queue<Short> pool;
 
     public TunnelController(String name, String password, int port, int maxclients, String master, String masterpw, boolean iplimit) {
         clients = new ConcurrentHashMap<Short, Client>();
@@ -64,7 +63,17 @@ public class TunnelController implements HttpHandler, Runnable {
         this.master = master;
         this.masterpw = masterpw;
         this.iplimit = iplimit;
-        this.serial = new Random();
+        this.pool = new ConcurrentLinkedQueue<Short>();
+
+        long start = System.currentTimeMillis();
+        ArrayList<Short> allShort = new ArrayList<Short>();
+        for (short i = Short.MIN_VALUE; i < Short.MAX_VALUE; i++) {
+            allShort.add(i);
+        }
+        Collections.shuffle(allShort);
+        pool.addAll(allShort);
+
+        Main.log("TunnelController: Took " + (System.currentTimeMillis() - start) + "ms to initialize pool.");
     }
 
     public Client getClient(Short clientId) {
@@ -128,8 +137,7 @@ public class TunnelController implements HttpHandler, Runnable {
 
         StringBuilder ret = new StringBuilder();
 
-        synchronized (serial) {
-            ret.append("[");
+        synchronized (clients) {
             if (requestedAmount + clients.size() > maxclients) {
                 // Service Unavailable
                 Main.log("Request wanted more than we could provide.");
@@ -138,15 +146,40 @@ public class TunnelController implements HttpHandler, Runnable {
                 return;
             }
 
+            ret.append("[");
+
+            // for thread safety, we just try to reserve slots (actually we are
+            // double synchronized right now, makes little sense)
+            ArrayList<Short> reserved = new ArrayList<Short>();
             for (int i = 0; i < requestedAmount; i++) {
-                // FIXME: not good enough, it will collide, use just for testing
-                short clientId = (short)(serial.nextInt() & 0xFFFF);
-                clients.put(clientId, new Client(clientId));
-                Main.log("Client " + clientId + " allocated.");
-                if (i > 0) {
-                    ret.append(",");
+                Short clientId = pool.poll();
+                if (clientId != null) {
+                    reserved.add(clientId);
                 }
-                ret.append(clientId);
+            }
+
+            if (reserved.size() == requestedAmount) {
+                boolean frist = true;
+                for (Short clientId : reserved) {
+                    clients.put(clientId, new Client(clientId));
+                    Main.log("Client " + clientId + " allocated.");
+                    if (frist) {
+                        frist = false;
+                    } else {
+                        ret.append(",");
+                    }
+                    ret.append(clientId);
+                }
+            } else {
+                // return our reservations if any
+                for (Short clientId : reserved) {
+                    pool.add(clientId);
+                }
+                // Service Unavailable
+                Main.log("Request wanted more than we could provide and we also exhausted our queue.");
+                t.sendResponseHeaders(503, 0);
+                t.getResponseBody().close();
+                return;
             }
             ret.append("]");
         }
