@@ -217,6 +217,35 @@ public class TunnelController implements HttpHandler, Runnable {
     public void setMaintenance() {
         maintenance = true;
         Main.log("Maintenance mode enabled, no new games can be started.\n");
+
+        if (master != null) {
+            try {
+                URL url = new URL(
+                    master + "?version=2"
+                    + "&name=" + URLEncoder.encode(name, "US-ASCII")
+                    + "&password=" + (password == null ? "0" : "1")
+                    + "&port=" + port
+                    + "&clients=" + clients.size()
+                    + "&maxclients=" + maxclients
+                    + (masterpw != null ? "&masterpw=" + URLEncoder.encode(masterpw, "US-ASCII") : "")
+                    + "&maintenance=1"
+                );
+                HttpURLConnection con = (HttpURLConnection)url.openConnection();
+                con.setRequestMethod("GET");
+                con.setConnectTimeout(5000);
+                con.setReadTimeout(5000);
+                con.connect();
+                con.getInputStream().close();
+                con.disconnect();
+                Main.log("Master notified of maintenance.\n");
+            } catch (FileNotFoundException e) {
+                Main.log("Master server reported error 404.");
+            } catch (MalformedURLException e) {
+                Main.log("Failed to send heartbeat: " + e.toString());
+            } catch (IOException e) {
+                Main.log("Failed to send heartbeat: " + e.toString());
+            }
+        }
     }
 
     @Override
