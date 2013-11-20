@@ -48,6 +48,7 @@ public class Main {
     // -logfile <str>       Log everything to this file
     // -headless            Don't start up the GUI
     // -iplimit             Enable (currently too strict) hosting rate limit
+    // -maintpw <str>       Enable maintenance mode with password
 
     protected static String name = "Unnamed CnCNet 5a tunnel";
     protected static int maxclients = 8;
@@ -59,6 +60,7 @@ public class Main {
     protected static boolean headless = false;
     protected static boolean iplimit = false;
     protected static String logfile = null;
+    protected static String maintpw = null;
 
     public static void main(String[] args) {
 
@@ -83,8 +85,10 @@ public class Main {
                 headless = true;
             } else if (args[i].equals("-iplimit")) {
                 iplimit = true;
+            } else if (args[i].equals("-maintpw") && i < args.length - 1) {
+                maintpw = args[++i];
             } else if (args[i].equals("-help") || args[i].equals("-h") || args[i].equals("-?") || args[i].equals("/h") || args[i].equals("/?")) {
-                System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-firstport <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>]");
+                System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-firstport <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>] [-iplimit] [-maintpw <string>]");
                 return;
             } else {
                 Main.log("Unknown parameter: " + args[i]);
@@ -136,6 +140,9 @@ public class Main {
         else
             Main.log("Master     : " + master);
 
+        if (maintpw != null)
+            Main.log("Maintenance: " + maintpw);
+
         if (logStream != null) {
             Main.log("Logging to " + logfile);
         }
@@ -155,6 +162,9 @@ public class Main {
             HttpServer server = HttpServer.create(new InetSocketAddress(port), 4);
             server.createContext("/request", controller);
             server.createContext("/status", controller);
+            if (maintpw != null) {
+                server.createContext("/maintenance/" + maintpw, controller);
+            }
             server.setExecutor(null);
             server.start();
 

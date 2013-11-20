@@ -52,6 +52,7 @@ public class TunnelController implements HttpHandler, Runnable {
     private String masterpw = null;
     private boolean iplimit;
     private Queue<Short> pool;
+    private volatile boolean maintenance = false;
 
     public TunnelController(String name, String password, int port, int maxclients, String master, String masterpw, boolean iplimit) {
         clients = new ConcurrentHashMap<Short, Client>();
@@ -120,6 +121,14 @@ public class TunnelController implements HttpHandler, Runnable {
             // Bad Request
             Main.log("Request had invalid requested amount (" + requestedAmount + ").");
             t.sendResponseHeaders(400, 0);
+            t.getResponseBody().close();
+            return;
+        }
+
+        if (maintenance) {
+            // Service Unavailable
+            Main.log("Request to start a new game was denied because of maintenance.");
+            t.sendResponseHeaders(503, 0);
             t.getResponseBody().close();
             return;
         }
@@ -199,6 +208,13 @@ public class TunnelController implements HttpHandler, Runnable {
         os.close();
     }
 
+    private void handleMaintenance(HttpExchange t) throws IOException {
+        maintenance = true;
+        Main.log("Maintenance mode enabled, no new games can be started.\n");
+        t.sendResponseHeaders(200, 0);
+        t.getResponseBody().close();
+    }
+
     @Override
     public void handle(HttpExchange t) throws IOException {
         String uri = t.getRequestURI().toString();
@@ -211,6 +227,8 @@ public class TunnelController implements HttpHandler, Runnable {
                 handleRequest(t);
             } else if (uri.startsWith("/status")) {
                 handleStatus(t);
+            } else if (uri.startsWith("/maintenance/")) {
+                handleMaintenance(t);
             } else {
                 t.sendResponseHeaders(400, 0);
             }
@@ -239,7 +257,13 @@ public class TunnelController implements HttpHandler, Runnable {
 
             long now = System.currentTimeMillis();
 
-            if (lastHeartbeat + 60000 < now && master != null) {
+            if (maintenance && clients.isEmpty()) {
+                Main.log("Tunnel empty, doing maintenance quit.");
+                System.exit(0);
+                return;
+            }
+
+            if (lastHeartbeat + 60000 < now && master != null && !maintenance) {
                 Main.log("Sending a heartbeat to master server.");
 
                 connected = false;
