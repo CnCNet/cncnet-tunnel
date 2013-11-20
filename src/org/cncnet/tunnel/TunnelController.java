@@ -209,10 +209,14 @@ public class TunnelController implements HttpHandler, Runnable {
     }
 
     private void handleMaintenance(HttpExchange t) throws IOException {
-        maintenance = true;
-        Main.log("Maintenance mode enabled, no new games can be started.\n");
+        setMaintenance();
         t.sendResponseHeaders(200, 0);
         t.getResponseBody().close();
+    }
+
+    public void setMaintenance() {
+        maintenance = true;
+        Main.log("Maintenance mode enabled, no new games can be started.\n");
     }
 
     @Override

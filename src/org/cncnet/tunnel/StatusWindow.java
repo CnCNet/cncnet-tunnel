@@ -18,6 +18,8 @@ package org.cncnet.tunnel;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -33,10 +35,11 @@ import javax.swing.border.EmptyBorder;
  *
  * @author Toni Spets <toni.spets@iki.fi>
  */
-public class StatusWindow extends JFrame {
+public class StatusWindow extends JFrame implements WindowListener {
 
     private JTextArea logArea;
     private JLabel statusLabel;
+    private volatile boolean closing = false;
 
     public StatusWindow() {
 
@@ -71,6 +74,7 @@ public class StatusWindow extends JFrame {
 
         this.add(mainPanel);
         this.setSize(600, 200);
+        this.addWindowListener(this);
     }
 
     public void log(final String str) {
@@ -95,5 +99,41 @@ public class StatusWindow extends JFrame {
                 window.setTitle("CnCNet Tunnel - " + str);
             }
         });
+    }
+
+    @Override
+    public void windowOpened(WindowEvent we) {
+    }
+
+    @Override
+    public void windowClosing(WindowEvent we) {
+        if (!closing && Main.controller != null) {
+            closing = true;
+            Main.controller.setMaintenance();
+            Main.log("Note: Clicking [X] again will exit immediately.");
+        } else {
+            System.exit(0);
+        }
+    }
+
+    @Override
+    public void windowClosed(WindowEvent we) {
+        System.exit(0);
+    }
+
+    @Override
+    public void windowIconified(WindowEvent we) {
+    }
+
+    @Override
+    public void windowDeiconified(WindowEvent we) {
+    }
+
+    @Override
+    public void windowActivated(WindowEvent we) {
+    }
+
+    @Override
+    public void windowDeactivated(WindowEvent we) {
     }
 }

@@ -38,6 +38,7 @@ public class Main {
 
     static FileOutputStream logStream = null;
     static StatusWindow statusWindow = null;
+    static TunnelController controller = null;
 
     // -name <str>          Custom name for the tunnel
     // -maxclients <num>    Maximum number of ports to allocate
@@ -112,7 +113,7 @@ public class Main {
 
         if (!headless) {
             statusWindow = new StatusWindow();
-            statusWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            statusWindow.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
             statusWindow.status("Initializing...");
             statusWindow.setVisible(true);
         }
@@ -156,7 +157,7 @@ public class Main {
             channel.socket().bind(new InetSocketAddress("0.0.0.0", port));
             channel.register(selector, SelectionKey.OP_READ);
 
-            TunnelController controller = new TunnelController(name, password, port, maxclients, nomaster ? null : master, masterpw, iplimit);
+            controller = new TunnelController(name, password, port, maxclients, nomaster ? null : master, masterpw, iplimit);
 
             // setup our HTTP server
             HttpServer server = HttpServer.create(new InetSocketAddress(port), 4);
