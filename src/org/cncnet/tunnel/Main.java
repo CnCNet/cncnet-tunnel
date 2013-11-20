@@ -19,14 +19,14 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.BufferOverflowException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.List;
 import javax.swing.JFrame;
 import javax.swing.UIManager;
 
@@ -212,6 +212,10 @@ public class Main {
                             }
                         } catch (IOException e) {
                             Main.log("IOException when handling event: " + e.getMessage());
+                        } catch (BufferUnderflowException e) {
+                            Main.log("BufferUnderflowException when handling event: " + e.getMessage());
+                        } catch (BufferOverflowException e) {
+                            Main.log("BufferOverflowException when handling event: " + e.getMessage());
                         }
 
                         if (!k.channel().isOpen()) {
@@ -225,6 +229,8 @@ public class Main {
 
         } catch (Exception e) {
             Main.log(e.toString());
+            e.printStackTrace();
+            System.exit(1);
         }
     }
 
