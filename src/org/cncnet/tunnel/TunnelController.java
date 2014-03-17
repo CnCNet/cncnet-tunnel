@@ -333,11 +333,13 @@ public class TunnelController implements HttpHandler, Runnable {
 
             for (Iterator<Map.Entry<Short, Client>> i = set.iterator(); i.hasNext();) {
                 Map.Entry<Short, Client> e = i.next();
+                Short id = e.getKey();
                 Client client = e.getValue();
 
                 if (client.getLastPacket() + 60000 < now) {
                     Main.log("Client " + e.getKey() +  " timed out.");
                     i.remove();
+                    pool.add(id);
                 }
             }
 
