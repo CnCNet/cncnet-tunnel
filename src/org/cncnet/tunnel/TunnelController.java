@@ -42,6 +42,19 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class TunnelController implements HttpHandler, Runnable {
 
+    private class Lock {
+        public long firstRequest;
+        public int games;
+
+        public Lock(long firstRequest) {
+            this.firstRequest = firstRequest;
+        }
+
+        public void poke() {
+            this.games++;
+        }
+    }
+
     private Map<Short, Client> clients;
 
     private String name;
@@ -50,11 +63,12 @@ public class TunnelController implements HttpHandler, Runnable {
     private int port;
     private String master;
     private String masterpw = null;
-    private boolean iplimit;
+    private int iplimit;
     private Queue<Short> pool;
     private volatile boolean maintenance = false;
+    final private ConcurrentHashMap<String, Lock> locks;
 
-    public TunnelController(String name, String password, int port, int maxclients, String master, String masterpw, boolean iplimit) {
+    public TunnelController(String name, String password, int port, int maxclients, String master, String masterpw, int iplimit) {
         clients = new ConcurrentHashMap<Short, Client>();
 
         this.name = name;
@@ -65,6 +79,7 @@ public class TunnelController implements HttpHandler, Runnable {
         this.masterpw = masterpw;
         this.iplimit = iplimit;
         this.pool = new ConcurrentLinkedQueue<Short>();
+        this.locks = new ConcurrentHashMap<String, Lock>();
 
         long start = System.currentTimeMillis();
         ArrayList<Short> allShort = new ArrayList<Short>();
@@ -133,16 +148,15 @@ public class TunnelController implements HttpHandler, Runnable {
             return;
         }
 
+        Lock curLock = locks.get(requestAddress);
         // lock the request ip out until this router is collected
-        /*
-        if (locks.containsKey(requestAddress)) {
+        if (iplimit > 0 && curLock != null && curLock.games >= iplimit) {
             // Too Many Requests
-            Main.log("Same address tried to request more than one active router.");
+            Main.log("Same address tried to request more than " + iplimit + " routers.");
             t.sendResponseHeaders(429, 0);
             t.getResponseBody().close();
             return;
         }
-        */
 
         StringBuilder ret = new StringBuilder();
 
@@ -191,6 +205,19 @@ public class TunnelController implements HttpHandler, Runnable {
                 return;
             }
             ret.append("]");
+        }
+
+        if (iplimit > 0) {
+            synchronized (locks) {
+                long now = System.currentTimeMillis();
+                Lock l = locks.get(requestAddress);
+                if (l == null) {
+                    l = new Lock(now);
+                }
+
+                l.poke();
+                locks.put(requestAddress, l);
+            }
         }
 
         t.sendResponseHeaders(200, ret.length());
@@ -340,6 +367,18 @@ public class TunnelController implements HttpHandler, Runnable {
                     Main.log("Client " + e.getKey() +  " timed out.");
                     i.remove();
                     pool.add(id);
+                }
+            }
+
+            Set<Map.Entry<String, Lock>> lset = locks.entrySet();
+
+            for (Iterator<Map.Entry<String, Lock>> i = lset.iterator(); i.hasNext();) {
+                Map.Entry<String, Lock> e = i.next();
+                Lock l = e.getValue();
+
+                if (l.firstRequest + 60000 < now) {
+                    Main.log("Lock " + e.getKey() +  " released.");
+                    i.remove();
                 }
             }
 

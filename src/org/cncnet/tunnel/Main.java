@@ -59,7 +59,7 @@ public class Main {
     protected static String masterpw = null;
     protected static boolean nomaster = false;
     protected static boolean headless = false;
-    protected static boolean iplimit = false;
+    protected static int iplimit = 2;
     protected static String logfile = null;
     protected static String maintpw = null;
 
@@ -84,12 +84,12 @@ public class Main {
                 logfile = args[++i];
             } else if (args[i].equals("-headless")) {
                 headless = true;
-            } else if (args[i].equals("-iplimit")) {
-                iplimit = true;
+            } else if (args[i].equals("-iplimit") && i < args.length - 1) {
+                iplimit = Math.abs(Integer.parseInt(args[++i]));
             } else if (args[i].equals("-maintpw") && i < args.length - 1) {
                 maintpw = args[++i];
             } else if (args[i].equals("-help") || args[i].equals("-h") || args[i].equals("-?") || args[i].equals("/h") || args[i].equals("/?")) {
-                System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-firstport <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>] [-iplimit] [-maintpw <string>]");
+                System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-firstport <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>] [-iplimit <number>] [-maintpw <string>]");
                 return;
             } else {
                 Main.log("Unknown parameter: " + args[i]);
@@ -148,7 +148,7 @@ public class Main {
             Main.log("Logging to " + logfile);
         }
 
-        Main.log("Host rate limit is " + (iplimit ? "enabled" : "disabled") + ".");
+        Main.log("Host rate limit is " + (iplimit > 0 ? iplimit + " games per ip" : "disabled") + ".");
 
         try {
             Selector selector = Selector.open();
