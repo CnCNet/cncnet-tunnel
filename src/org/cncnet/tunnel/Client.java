@@ -16,7 +16,7 @@
 package org.cncnet.tunnel;
 
 import java.net.InetSocketAddress;
-import java.util.Map;
+import java.util.List;
 
 /**
  *
@@ -27,10 +27,20 @@ public class Client {
     private short id;
     private InetSocketAddress address;
     private long lastPacket;
+    private List<Short> friends;
 
-    public Client(short id) { 
+    public Client(short id, List<Short> friends) { 
         this.id = id;
         this.lastPacket = System.currentTimeMillis();
+        this.friends = friends;
+    }
+
+    public short getId() {
+        return this.id;
+    }
+
+    public boolean isKnownClient(short otherId) {
+        return friends.contains(otherId);
     }
 
     public void setAddress(InetSocketAddress newAddress) {

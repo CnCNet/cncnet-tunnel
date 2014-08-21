@@ -89,7 +89,7 @@ public class Main {
             } else if (args[i].equals("-maintpw") && i < args.length - 1) {
                 maintpw = args[++i];
             } else if (args[i].equals("-help") || args[i].equals("-h") || args[i].equals("-?") || args[i].equals("/h") || args[i].equals("/?")) {
-                System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-firstport <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>] [-iplimit <number>] [-maintpw <string>]");
+                System.out.println("Arguments: [-name <string>] [-maxclients <number>] [-password <string>] [-port <number>] [-master <URL>] [-masterpw <string>] [-nomaster] [-logfile <path>] [-iplimit <number>] [-maintpw <string>]");
                 return;
             } else {
                 Main.log("Unknown parameter: " + args[i]);
@@ -198,14 +198,18 @@ public class Main {
                             if (clientFrom != null) {
                                 if (clientFrom.getAddress() == null) {
                                     clientFrom.setAddress(from);
+                                } else {
+                                    // don't allow faking client id
+                                    if (!from.getAddress().equals(clientFrom.getAddress().getAddress()))
+                                        clientFrom = null;
                                 }
-                                clientFrom.setLastPacket(now);
                             }
 
-                            if (clientFrom == null || clientTo == null || hdrFrom == hdrTo) {
+                            if (clientFrom == null || clientTo == null || hdrFrom == hdrTo || !clientTo.isKnownClient(clientFrom.getId())) {
                                 Main.log("Ignoring packet from " + hdrFrom + " to " + hdrTo + " (" + from + "), was " + buf.limit() + " bytes");
                             } else {
-                                //Main.log("Packet from " + hdrFrom + " routed to " + hdrTo + " (" + clientTo.getAddress() + "), was " + buf.limit() + " bytes");
+                                clientFrom.setLastPacket(now);
+
                                 if (clientTo.getAddress() != null) {
                                     chan.send(buf, clientTo.getAddress());
                                 }

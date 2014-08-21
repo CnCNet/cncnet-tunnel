@@ -184,7 +184,7 @@ public class TunnelController implements HttpHandler, Runnable {
             if (reserved.size() == requestedAmount) {
                 boolean frist = true;
                 for (Short clientId : reserved) {
-                    clients.put(clientId, new Client(clientId));
+                    clients.put(clientId, new Client(clientId, reserved));
                     Main.log("Client " + clientId + " allocated.");
                     if (frist) {
                         frist = false;
